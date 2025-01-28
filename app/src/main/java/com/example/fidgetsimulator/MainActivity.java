@@ -7,9 +7,6 @@ import android.widget.FrameLayout;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.fidgetsimulator.FidgetSpinnerView;
-import com.example.fidgetsimulator.R;
-
 public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
