@@ -1,10 +1,15 @@
 package com.example.fidgetsimulator;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.media.SoundPool;
+import android.media.MediaPlayer;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
@@ -18,10 +23,7 @@ public class FidgetSpinnerView extends View {
     private float currentRotation = 0f;
     private float initialTouchX = 0f, initialTouchY = 0f;
     private ObjectAnimator spinAnimator;
-
-    private SoundPool soundPool;
-    private int spinnerSoundId;
-    private int currentStreamId = -1;
+    private MediaPlayer mediaPlayer;
 
     public FidgetSpinnerView(Context context, Bitmap spinnerImage) {
         super(context);
@@ -29,10 +31,6 @@ public class FidgetSpinnerView extends View {
         float centerY = getResources().getDisplayMetrics().heightPixels / 2f;
 
         spinnerComponent = new ImageComponent(spinnerImage, centerX, centerY);
-
-        soundPool = new SoundPool.Builder().setMaxStreams(1).build();
-        spinnerSoundId = soundPool.load(context, R.raw.fidget_spinner1, 1);
-
     }
 
     @Override
@@ -84,50 +82,131 @@ public class FidgetSpinnerView extends View {
         float velocityMagnitude = (float) Math.sqrt(velocityX * velocityX + velocityY * velocityY);
 
         float velocityModifier = 1f;
-        if (velocityMagnitude < 400) {
+        if (velocityMagnitude < 1000) {
             velocityModifier = velocityMagnitude/1000f;
         }
 
         // Calculate the final rotation based on swipe speed and direction
-        float finalRotation = currentRotation + direction * velocityMagnitude * velocityModifier * 10;
-
+        float finalRotation = currentRotation + direction * velocityMagnitude * (float) Math.pow(velocityModifier, 2) * 10;
+        System.out.println(velocityMagnitude);
         // Dynamically calculate the duration for deceleration
-        float duration = Math.min(velocityMagnitude * 50f, 10000); // Max duration: 10 seconds
-
+        float duration = Math.min((float) Math.sqrt(velocityMagnitude) * (velocityModifier * 250f), 18000); // Max duration: 10 seconds
         // Start the spinning animation
         startSpin(finalRotation, duration);
     }
 
+    private Handler fadeOutHandler = new Handler(Looper.getMainLooper());
+    private Runnable fadeOutRunnable;
+
     private void startSpin(float targetRotation, float duration) {
-
-        // Start playing the sound
-        if (currentStreamId != -1) {
-            soundPool.stop(currentStreamId); // Stop any currently playing sound
-        }
-        currentStreamId = soundPool.play(spinnerSoundId, 1f, 1f, 0, -1, 1f); // Loop the sound
-
         // Cancel any ongoing animation
         if (spinAnimator != null && spinAnimator.isRunning()) {
             spinAnimator.cancel();
         }
 
-        // Create an ObjectAnimator to rotate the spinner
+        // Cancel any pending fade-out task
+        if (fadeOutRunnable != null) {
+            fadeOutHandler.removeCallbacks(fadeOutRunnable);
+        }
+
+        // Stop and reset previous sound safely
+        if (mediaPlayer != null) {
+            mediaPlayer.stop();
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
+
+        //Duration for a velocity of ~650
+        int soundlessLimit = 4143;
+
+        if (duration > soundlessLimit) {
+            // Load new sound
+            mediaPlayer = MediaPlayer.create(getContext(), R.raw.fidget_spinner1);
+            if (mediaPlayer == null) return;  // Ensure mediaPlayer is valid
+
+            // Get sound file duration
+            int soundDuration = mediaPlayer.getDuration();
+            int skipTime = Math.max(0, soundDuration - (int) duration);
+
+            // Start playback
+            mediaPlayer.start();
+            mediaPlayer.seekTo(skipTime);
+
+            // Schedule fade-out 2 seconds before animation ends
+            long fadeOutStartTime = (long) duration - 2500;
+            if (fadeOutStartTime > 0) {
+                fadeOutRunnable = () -> {
+                    if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                        fadeOutSound(1500);
+                    }
+                };
+                fadeOutHandler.postDelayed(fadeOutRunnable, fadeOutStartTime);
+            }
+        }
+
+        // Create and start the animation
         spinAnimator = ObjectAnimator.ofFloat(this, "rotation", currentRotation, targetRotation);
-
-        // Increase the duration for slower deceleration
         spinAnimator.setDuration((long) duration);
+        spinAnimator.setInterpolator(new DecelerateInterpolator(1.1f));
 
-        // Use a DecelerateInterpolator for natural slowing
-        spinAnimator.setInterpolator(new DecelerateInterpolator(1.0f)); // Adjust factor for smoother deceleration
-
-        // Update currentRotation on every frame
         spinAnimator.addUpdateListener(animation -> {
             currentRotation = (float) animation.getAnimatedValue() % 360;
         });
 
-        // Start the animation
+        // Stop sound completely when animation ends
+        spinAnimator.addListener(new AnimatorListenerAdapter() {
+            private boolean wasCancelled = false;
+
+            @Override
+            public void onAnimationStart(Animator animation) {
+                wasCancelled = false;
+            }
+
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (!wasCancelled && mediaPlayer != null) {
+                    mediaPlayer.stop();
+                    mediaPlayer.release();
+                    mediaPlayer = null;
+                }
+            }
+
+            @Override
+            public void onAnimationCancel(Animator animation) {
+                wasCancelled = true;
+            }
+        });
+
         spinAnimator.start();
     }
+
+    // Updated fade-out function
+    private void fadeOutSound(int fadeDuration) {
+        if (mediaPlayer == null || !mediaPlayer.isPlaying()) return;
+
+        ValueAnimator fadeAnimator = ValueAnimator.ofFloat(1.0f, 0.0f);
+        fadeAnimator.setDuration(fadeDuration);
+        fadeAnimator.addUpdateListener(animation -> {
+            if (mediaPlayer != null) {
+                float volume = (float) animation.getAnimatedValue();
+                mediaPlayer.setVolume(volume, volume);
+            }
+        });
+
+        fadeAnimator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                    mediaPlayer.release();
+                    mediaPlayer = null;
+                }
+            }
+        });
+
+        fadeAnimator.start();
+    }
+
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
