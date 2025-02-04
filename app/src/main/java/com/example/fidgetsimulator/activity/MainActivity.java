@@ -1,4 +1,4 @@
-package com.example.fidgetsimulator;
+package com.example.fidgetsimulator.activity;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -6,6 +6,9 @@ import android.os.Bundle;
 import android.widget.FrameLayout;
 
 import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.fidgetsimulator.views.FidgetSpinnerView;
+import com.example.fidgetsimulator.R;
 
 public class MainActivity extends AppCompatActivity {
     @Override
