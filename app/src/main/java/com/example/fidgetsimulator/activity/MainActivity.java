@@ -7,8 +7,9 @@ import android.widget.FrameLayout;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.fidgetsimulator.views.FidgetSpinnerView;
 import com.example.fidgetsimulator.R;
+import com.example.fidgetsimulator.utils.Configuration;
+import com.example.fidgetsimulator.views.FidgetSpinnerView;
 
 public class MainActivity extends AppCompatActivity {
     @Override
@@ -16,7 +17,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         // Load the spinner image from resources
-        Bitmap spinnerImage = BitmapFactory.decodeResource(getResources(), R.drawable.fidget_spinner_black_image_2);
+        Bitmap spinnerImage = BitmapFactory.decodeResource(getResources(), Configuration.SPINNER_IMAGE_SOURCE);
 
         // Create the FidgetSpinnerView
         FidgetSpinnerView spinnerView = new FidgetSpinnerView(this, spinnerImage);

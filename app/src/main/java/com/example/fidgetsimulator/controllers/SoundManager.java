@@ -12,55 +12,48 @@ import android.util.Log;
 
 import com.example.fidgetsimulator.R;
 
-import com.example.fidgetsimulator.utils.SpinnerConstants;
+import com.example.fidgetsimulator.utils.Configuration;
 
 public class SoundManager {
     private MediaPlayer mediaPlayer;
-    private final Context context;
-    private final Handler handler;
+    private Handler fadeOutHandler;
     private Runnable fadeOutRunnable;
 
-    public SoundManager(Context context) {
-        this.context = context;
-        this.handler = new Handler(Looper.getMainLooper());
+    public SoundManager() {
+        fadeOutHandler = new Handler(Looper.getMainLooper());
     }
 
-    public void playSpinSound(float duration) {
-        if (duration <= SpinnerConstants.SOUNDLESS_DURATION_THRESHOLD) return;
+    public void playSpinnerSound(Context context, int resourceId, float duration) {
+        if (duration > Configuration.SOUNDLESS_DURATION_THRESHOLD) {
+            // Load new sound
+            mediaPlayer = MediaPlayer.create(context, resourceId);
+            if (mediaPlayer == null) return;  // Ensure mediaPlayer is valid
 
-        releasePlayer(); // Clean up previous instance
-
-        try {
-            mediaPlayer = MediaPlayer.create(context, R.raw.fidget_spinner1);
-            if (mediaPlayer == null) return;
-
+            // Get sound file duration
             int soundDuration = mediaPlayer.getDuration();
-            mediaPlayer.seekTo(Math.max(0, soundDuration - (int) duration));
+            int skipTime = Math.max(0, soundDuration - (int) duration);
+
+            // Start playback
             mediaPlayer.start();
+            mediaPlayer.seekTo(skipTime);
 
-            scheduleFadeOut((long) duration);
-        } catch (Exception e) {
-            Log.e("SoundManager", "Error playing sound", e);
+            long fadeOutStartTime = (long) duration - Configuration.EARLY_FADE_OFFSET;
+            if (fadeOutStartTime > 0) {
+                fadeOutRunnable = () -> {
+                    if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                        fadeOutSound(Configuration.FADE_DURATION);
+                    }
+                };
+                fadeOutHandler.postDelayed(fadeOutRunnable, fadeOutStartTime);
+            }
         }
     }
 
-    private void scheduleFadeOut(long totalDuration) {
-        if (fadeOutRunnable != null) {
-            handler.removeCallbacks(fadeOutRunnable);
-        }
-
-        long fadeOutStartTime = totalDuration - 2500;
-        if (fadeOutStartTime > 0) {
-            fadeOutRunnable = this::fadeOutSound;
-            handler.postDelayed(fadeOutRunnable, fadeOutStartTime);
-        }
-    }
-
-    private void fadeOutSound() {
+    public void fadeOutSound(int fadeDuration) {
         if (mediaPlayer == null || !mediaPlayer.isPlaying()) return;
 
         ValueAnimator fadeAnimator = ValueAnimator.ofFloat(1.0f, 0.0f);
-        fadeAnimator.setDuration(SpinnerConstants.FADE_OUT_DURATION);
+        fadeAnimator.setDuration(fadeDuration);
         fadeAnimator.addUpdateListener(animation -> {
             if (mediaPlayer != null) {
                 float volume = (float) animation.getAnimatedValue();
@@ -71,25 +64,31 @@ public class SoundManager {
         fadeAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                releasePlayer();
+                if (mediaPlayer != null) {
+                    mediaPlayer.stop();
+                    mediaPlayer.release();
+                    mediaPlayer = null;
+                }
             }
         });
+
         fadeAnimator.start();
     }
 
-    public void releasePlayer() {
-        handler.removeCallbacksAndMessages(null);
+    public void cancelFadeOut(){
+        // Cancel any pending fade-out task
+        if (fadeOutRunnable != null) {
+            fadeOutHandler.removeCallbacks(fadeOutRunnable);
+        }
+    }
+
+    public void stopSound() {
         if (mediaPlayer != null) {
-            try {
-                if (mediaPlayer.isPlaying()) {
-                    mediaPlayer.stop();
-                }
-                mediaPlayer.release();
-            } catch (Exception e) {
-                Log.e("SoundManager", "Error releasing player", e);
-            }
+            mediaPlayer.stop();
+            mediaPlayer.release();
             mediaPlayer = null;
         }
     }
 }
+
 

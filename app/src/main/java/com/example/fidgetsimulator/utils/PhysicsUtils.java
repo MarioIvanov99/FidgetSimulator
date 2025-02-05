@@ -1,4 +1,4 @@
-package com.example.fidgetsimulator.utils;
+/*package com.example.fidgetsimulator.utils;
 
 public class PhysicsUtils {
     public static class SwipePhysics {
@@ -7,7 +7,7 @@ public class PhysicsUtils {
             return currentRotation + direction * velocityMagnitude * (float) Math.pow(velocityModifier, 2) * SpinnerConstants.ROTATION_MULTIPLIER;
         }
 
-        public static int calculateDirection(float velocityX, float velocityY, float swipeStartX, float swipeStartY){
+        public static double calculateDirection(float velocityX, float velocityY, float swipeStartX, float swipeStartY){
             // Calculate the angle of the swipe vector
             double startAngle = Math.atan2(swipeStartY, swipeStartX);
             double endAngle = Math.atan2(velocityY, velocityX);
@@ -25,4 +25,4 @@ public class PhysicsUtils {
             return Math.min((float) Math.sqrt(velocityMagnitude) * (velocityModifier * 250f), SpinnerConstants.MAX_ANIMATION_DURATION);
         }
     }
-}
+}*/

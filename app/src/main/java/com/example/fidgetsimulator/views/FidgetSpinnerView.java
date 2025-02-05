@@ -1,61 +1,29 @@
 package com.example.fidgetsimulator.views;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
-import android.media.MediaPlayer;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.animation.DecelerateInterpolator;
 
 import androidx.annotation.NonNull;
 
 import com.example.fidgetsimulator.components.ImageComponent;
-import com.example.fidgetsimulator.controllers.SoundManager;
-import com.example.fidgetsimulator.controllers.SpinAnimator;
-import com.example.fidgetsimulator.utils.PhysicsUtils;
+import com.example.fidgetsimulator.controllers.SpinnerAnimator;
+import com.example.fidgetsimulator.utils.Configuration;
 
 public class FidgetSpinnerView extends View {
-    private final ImageComponent spinnerComponent;
-    private final SpinAnimator spinAnimator;
-    private final SoundManager soundManager;
-    private float currentRotation = 0f;
-    private float initialTouchX, initialTouchY;
+    final private ImageComponent spinnerComponent;
+    private float initialTouchX = 0f, initialTouchY = 0f;
+    final private SpinnerAnimator spinnerAnimator;
 
     public FidgetSpinnerView(Context context, Bitmap spinnerImage) {
         super(context);
-        spinnerComponent = new ImageComponent(spinnerImage, getCenterX(), getCenterY());
-        spinAnimator = new SpinAnimator(this);
-        soundManager = new SoundManager(context);
-        setupAnimationListeners();
-    }
+        float centerX = getResources().getDisplayMetrics().widthPixels / 2f;
+        float centerY = getResources().getDisplayMetrics().heightPixels / 2f;
 
-    private float getCenterX() {
-        return getResources().getDisplayMetrics().widthPixels / 2f;
-    }
-
-    private float getCenterY() {
-        return getResources().getDisplayMetrics().heightPixels / 2f;
-    }
-
-    private void setupAnimationListeners() {
-        spinAnimator.setAnimationListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                soundManager.releasePlayer();
-            }
-
-            @Override
-            public void onAnimationCancel(Animator animation) {
-                soundManager.releasePlayer();
-            }
-        });
+        spinnerComponent = new ImageComponent(spinnerImage, centerX, centerY);
+        spinnerAnimator = new SpinnerAnimator();
     }
 
     @Override
@@ -90,44 +58,38 @@ public class FidgetSpinnerView extends View {
         float swipeStartX = initialTouchX - centerX;
         float swipeStartY = initialTouchY - centerY;
 
+        // Calculate the angle of the swipe vector
+        double startAngle = Math.atan2(swipeStartY, swipeStartX);
+        double endAngle = Math.atan2(velocityY, velocityX);
+        double deltaAngle = Math.toDegrees(endAngle - startAngle);
+
+        // Normalize deltaAngle to determine direction
+        if (deltaAngle > 180) deltaAngle -= 360;
+        if (deltaAngle < -180) deltaAngle += 360;
+
         // Determine rotation direction: clockwise (positive) or counterclockwise (negative)
-        int direction = PhysicsUtils.SwipePhysics.calculateDirection(velocityX, velocityY, swipeStartX, swipeStartY);
+        int direction = deltaAngle > 0 ? 1 : -1;
 
         // Calculate the magnitude of the swipe velocity
-        float velocityMagnitude = (float) Math.hypot(velocityX, velocityY);
+        float velocityMagnitude = (float) Math.sqrt(velocityX * velocityX + velocityY * velocityY);
 
         float velocityModifier = 1f;
-        if (velocityMagnitude < 1000) {
+        if (velocityMagnitude < Configuration.VELOCITY_THRESHOLD) {
             velocityModifier = velocityMagnitude/1000f;
         }
 
         // Calculate the final rotation based on swipe speed and direction
-        float finalRotation = PhysicsUtils.SwipePhysics.calculateRotation(velocityMagnitude, velocityModifier, currentRotation, direction);
-
+        float finalRotation = spinnerAnimator.getCurrentRotation() + direction * velocityMagnitude * (float) Math.pow(velocityModifier, 2) * Configuration.ROTATION_MULTIPLIER;
+        System.out.println(velocityMagnitude);
         // Dynamically calculate the duration for deceleration
-        float duration = PhysicsUtils.SwipePhysics.calculateDuration(velocityMagnitude, velocityModifier);
+        float duration = Math.min((float) Math.sqrt(velocityMagnitude) * (velocityModifier * 250f), Configuration.MAX_ANIMATION_DURATION); // Max duration: 18 seconds
         // Start the spinning animation
-        startSpin(finalRotation, duration);
-    }
-
-    private Handler fadeOutHandler = new Handler(Looper.getMainLooper());
-    private Runnable fadeOutRunnable;
-
-    private void startSpin(float targetRotation, float duration) {
-        spinAnimator.startSpin(targetRotation, duration);
-        soundManager.playSpinSound(duration);
+        spinnerAnimator.startSpin(this, finalRotation, duration);
     }
 
     @Override
     protected void onDraw(@NonNull Canvas canvas) {
         super.onDraw(canvas);
         spinnerComponent.draw(canvas);
-    }
-
-    @Override
-    protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        soundManager.releasePlayer();
-        spinAnimator.cancelAnimation();
     }
 }
