@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.fidgetsimulator.R;
 import com.example.fidgetsimulator.utils.Configuration;
+import com.example.fidgetsimulator.views.FidgetSpinnerControlView;
 import com.example.fidgetsimulator.views.FidgetSpinnerView;
 
 public class MainActivity extends AppCompatActivity {
@@ -19,12 +20,11 @@ public class MainActivity extends AppCompatActivity {
         // Load the spinner image from resources
         Bitmap spinnerImage = BitmapFactory.decodeResource(getResources(), Configuration.SPINNER_IMAGE_SOURCE);
 
-        // Create the FidgetSpinnerView
-        FidgetSpinnerView spinnerView = new FidgetSpinnerView(this, spinnerImage);
+        // Create composite view
+        FidgetSpinnerControlView controlView =
+                new FidgetSpinnerControlView(this, spinnerImage);
 
-        // Set the spinner view as the content view
-        FrameLayout layout = new FrameLayout(this);
-        layout.addView(spinnerView);
-        setContentView(layout);
+        // Set as content view
+        setContentView(controlView);
     }
 }
